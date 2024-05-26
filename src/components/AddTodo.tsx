@@ -1,59 +1,82 @@
 import React, { useState } from "react";
-import { ITodos } from "../App";
+import { Button, Input, Form, Select } from "antd";
+import { connect } from "react-redux";
 
-interface AddTodoProps {
-  addTodo: (
-    name: string,
-    parentId: number | null,
-    childrens: ITodos[] | null
-  ) => void;
-  todos: ITodos[];
-}
+import { addTodo } from "../redux/actions";
+import { ITodos } from "../redux/reducers/counterReducer";
 
-const AddTodo: React.FC<AddTodoProps> = ({ addTodo, todos }) => {
-  const [inputValue, setInputValue] = useState("");
-  const [parentValue, setParentValue] = useState<string>("");
+const AddTodo = (props: any) => {
+  const [form] = Form.useForm();
+  const [inputValue, setInputValue] = useState<string>("");
+  const [parentValue, setParentValue] = useState<number | null>(null);
 
-  const handleChange = (e: any) => {
+  const parentTodos = props.todos.filter(
+    (todo: ITodos) => todo.parentId === null
+  );
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
   };
 
-  const handleChangeParentValue = (e: any) => {
-    setParentValue(e.target.value);
+  const handleParentChange = (value: number | null) => {
+    setParentValue(value);
   };
 
-  const parentTodos = todos.filter((todo: ITodos) => todo.parentId === null);
-
-  const handleSubmit = (e: any) => {
-    e.preventDefault();
-    if (inputValue.trim()) {
-      const parentId = parentValue === "" ? null : parseInt(parentValue);
-      addTodo(inputValue, parentId, null);
-      setInputValue("");
-      setParentValue("");
+  const handleSubmit = (values: { name: string; parentId: string }) => {
+    const { name, parentId } = values;
+    const parentValue = parentId ? parentId : null;
+    if (name.trim()) {
+      props.addTodo(name, parentValue);
+      form.resetFields();
     }
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <input
-        type="text"
-        placeholder="Add to do"
-        value={inputValue}
-        onChange={handleChange}
-      />
-
-      <select value={parentValue} onChange={handleChangeParentValue}>
-        <option value="">---Choose parent todo---</option>
-        {parentTodos.map((parentTodo: ITodos) => (
-          <option key={parentTodo.id} value={parentTodo.id}>
-            {parentTodo.name}
-          </option>
-        ))}
-      </select>
-      <button type="submit">Submit</button>
-    </form>
+    <Form form={form} onFinish={handleSubmit} layout="inline">
+      <Form.Item
+        name="name"
+        rules={[{ required: true, message: "Please enter a todo name" }]}
+      >
+        <Input
+          placeholder="Add to do"
+          value={inputValue}
+          onChange={handleChange}
+        />
+      </Form.Item>
+      <Form.Item name="parentId">
+        <Select
+          placeholder="---Choose parent todo---"
+          value={parentValue}
+          onChange={handleParentChange}
+        >
+          <Select.Option value={null}>None</Select.Option>
+          {parentTodos.map((parentTodo: ITodos) => (
+            <Select.Option key={parentTodo.id} value={parentTodo.id}>
+              {parentTodo.name}
+            </Select.Option>
+          ))}
+        </Select>
+      </Form.Item>
+      <Form.Item>
+        <Button type="primary" htmlType="submit">
+          Add
+        </Button>
+      </Form.Item>
+    </Form>
   );
 };
 
-export default AddTodo;
+const mapStateToProps = (state: any) => {
+  return {
+    todos: state.todos,
+  };
+};
+
+const mapDispatchToProps = (dispatch: any) => {
+  return {
+    addTodo: (name: string, parentId: number | null) =>
+      dispatch(addTodo(name, parentId)),
+  };
+};
+
+export default connect(mapStateToProps, mapDispatchToProps)(AddTodo);

@@ -1,18 +1,11 @@
 import React, { useState } from "react";
-import { ITodos } from "../App";
+import { connect } from "react-redux";
+import { Form, Input, Button } from "antd";
 
-interface ListTodosProps {
-  todos: ITodos[];
-  deleteTodo: (id: number, parentId: number | null) => void;
-  updateTodo: (id: number, name: string) => void;
-}
+import { ITodos } from "../redux/reducers/counterReducer";
+import { deleteTodo, editTodo } from "../redux/actions";
 
-const ListTodos: React.FC<ListTodosProps> = ({
-  todos,
-  deleteTodo,
-  updateTodo,
-}) => {
-  console.log(todos);
+const ListTodos = (props: any) => {
   const [edit, setEdit] = useState<number | null>(null);
   const [name, setName] = useState("");
 
@@ -21,31 +14,36 @@ const ListTodos: React.FC<ListTodosProps> = ({
     setName(name);
   };
 
-  const handleChange = (e: any) => {
-    setName(e.target.value);
-  };
-
-  const handleSave = (id: number) => {
-    updateTodo(id, name);
+  const handleSave = (values: { name: string }) => {
+    const { name } = values;
+    props.editTodo(edit, name);
     setEdit(null);
   };
   return (
     <div>
       <ul>
-        {todos.map((todo) => (
+        {props.todos.map((todo: ITodos) => (
           <li key={todo.id}>
             {edit === todo.id ? (
-              <div>
-                <input type="text" value={name} onChange={handleChange} />{" "}
-                <button onClick={() => handleSave(todo.id)}>save</button>
-              </div>
+              <Form onFinish={handleSave}>
+                <Form.Item name="name" initialValue={name}>
+                  <Input />
+                </Form.Item>
+                <Form.Item>
+                  <Button type="primary" htmlType="submit">
+                    Save
+                  </Button>
+                </Form.Item>
+              </Form>
             ) : (
               <div>
                 <span>{todo.name}</span>
                 <button onClick={() => handleEdit(todo.id, todo.name)}>
                   edit
                 </button>
-                <button onClick={() => deleteTodo(todo.id, todo.parentId)}>
+                <button
+                  onClick={() => props.deleteTodo(todo.id, todo.parentId)}
+                >
                   delete
                 </button>
               </div>
@@ -55,12 +53,16 @@ const ListTodos: React.FC<ListTodosProps> = ({
               {todo.childrens?.map((children: ITodos) => (
                 <li key={children.id}>
                   {edit === children.id ? (
-                    <div>
-                      <input type="text" value={name} onChange={handleChange} />{" "}
-                      <button onClick={() => handleSave(children.id)}>
-                        save
-                      </button>
-                    </div>
+                    <Form onFinish={handleSave}>
+                      <Form.Item name="name" initialValue={name}>
+                        <Input />
+                      </Form.Item>
+                      <Form.Item>
+                        <Button type="primary" htmlType="submit">
+                          Save
+                        </Button>
+                      </Form.Item>
+                    </Form>
                   ) : (
                     <div>
                       <span>{children.name}</span>
@@ -71,7 +73,7 @@ const ListTodos: React.FC<ListTodosProps> = ({
                       </button>
                       <button
                         onClick={() =>
-                          deleteTodo(children.id, children.parentId)
+                          props.deleteTodo(children.id, children.parentId)
                         }
                       >
                         delete
@@ -87,5 +89,18 @@ const ListTodos: React.FC<ListTodosProps> = ({
     </div>
   );
 };
+const mapStateToProps = (state: any) => {
+  return {
+    todos: state.todos,
+  };
+};
 
-export default ListTodos;
+const mapDispatchToProps = (dispatch: any) => {
+  return {
+    editTodo: (id: number, name: string) => dispatch(editTodo(id, name)),
+    deleteTodo: (id: number, parentId: number) =>
+      dispatch(deleteTodo(id, parentId)),
+  };
+};
+
+export default connect(mapStateToProps, mapDispatchToProps)(ListTodos);
