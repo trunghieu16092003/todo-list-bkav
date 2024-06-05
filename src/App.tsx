@@ -1,93 +1,162 @@
-import React, { Children, useState } from "react";
-import AddTodo from "./components/AddTodo";
-import ListTodos from "./components/ListTodos";
+import React, { useState } from 'react';
+import TodoList from './components/TodoList';
+import TodoModal from './components/TodoModal';
+import type { TreeDataNode, TreeProps } from 'antd';
+import 'antd/dist/reset.css';
 
-export interface ITodos {
-  id: number;
-  name: string;
-  parentId: number | null;
-  childrens: ITodos[] | null;
-}
+const App: React.FC = () => {
+  const [treeData, setTreeData] = useState<TreeDataNode[]>([]);
+  const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [modalInputValue, setModalInputValue] = useState('');
+  const [editingNodeKey, setEditingNodeKey] = useState<React.Key | null>(null);
 
-function App() {
-  const [todos, setTodos] = useState<ITodos[]>([
-    {
-      id: 0,
-      name: "doing exercise",
-      parentId: null,
-      childrens: null,
-    },
-  ]);
+  const onExpand = (newExpandedKeys: React.Key[]) => {
+    setExpandedKeys(newExpandedKeys);
+  };
 
-  function randomId() {
-    const min = 0;
-    const max = 9999999;
-    const randomNumber = Math.floor(Math.random() * (max - min + 1)) + min;
-    return randomNumber;
-  }
+  const onDragEnter: TreeProps['onDragEnter'] = (info) => {
+    console.log(info);
+  };
 
-  const addTodo = (name: string, parentId: number | null) => {
-    const newTodo = { id: randomId(), name, parentId, childrens: null };
-    setTodos((prevTodos) => {
-      if (parentId !== null) {
-        return prevTodos.map((todo) =>
-          todo.id === parentId
-            ? { ...todo, childrens: [...(todo.childrens || []), newTodo] }
-            : todo
-        );
+  const onDrop: TreeProps['onDrop'] = (info) => {
+    const dropKey = info.node.key;
+    const dragKey = info.dragNode.key;
+    const dropPos = info.node.pos.split('-');
+    const dropPosition = info.dropPosition - Number(dropPos[dropPos.length - 1]);
+
+    const loop = (
+      data: TreeDataNode[],
+      key: React.Key,
+      callback: (node: TreeDataNode, i: number, data: TreeDataNode[]) => void,
+    ) => {
+      for (let i = 0; i < data.length; i++) {
+        if (data[i].key === key) {
+          return callback(data[i], i, data);
+        }
+        if (data[i].children) {
+          loop(data[i].children!, key, callback);
+        }
       }
-      return [...prevTodos, newTodo];
-    });
-  };
+    };
+    const data = [...treeData];
 
-  const updateTodo = (id: number, name: string) => {
-    setTodos((prevTodos) => {
-      return prevTodos.map((todo) => {
-        if (todo.id === id) {
-          return { ...todo, name };
-        }
-        if (todo.childrens) {
-          return {
-            ...todo,
-            childrens: todo.childrens.map((child) =>
-              child.id === id ? { ...child, name } : child
-            ),
-          };
-        }
-        return todo;
-      });
+    let dragObj: TreeDataNode;
+    loop(data, dragKey, (item, index, arr) => {
+      arr.splice(index, 1);
+      dragObj = item;
     });
-  };
 
-  const deleteTodo = (id: number, parentId: number | null) => {
-    if (parentId !== null) {
-      setTodos((prevTodos) => {
-        return prevTodos.map((todo) => {
-          if (todo.id === parentId) {
-            const updatedChildrens = (todo.childrens || []).filter(
-              (child) => child.id !== id
-            );
-            return { ...todo, childrens: updatedChildrens };
-          }
-          return todo;
-        });
+    if (!info.dropToGap) {
+      loop(data, dropKey, (item) => {
+        item.children = item.children || [];
+        item.children.unshift(dragObj);
       });
     } else {
-      const filterTodos = todos.filter((todo) => todo.id !== id);
-      setTodos(filterTodos);
+      let ar: TreeDataNode[] = [];
+      let i: number;
+      loop(data, dropKey, (_item, index, arr) => {
+        ar = arr;
+        i = index;
+      });
+      if (dropPosition === -1) {
+        ar.splice(i!, 0, dragObj!);
+      } else {
+        ar.splice(i! + 1, 0, dragObj!);
+      }
+    }
+    setTreeData(data);
+  };
+
+  const addNode = () => {
+    setTreeData([...treeData, { title: 'Công việc mới', key: `${Date.now()}`, children: [] }]);
+  };
+
+  const deleteNode = (key: React.Key) => {
+    const loop = (data: TreeDataNode[]): TreeDataNode[] => {
+      return data.filter(item => {
+        if (item.children) {
+          item.children = loop(item.children);
+        }
+        return item.key !== key;
+      });
+    };
+    setTreeData(loop(treeData));
+  };
+
+  const editNode = (key: React.Key) => {
+    setEditingNodeKey(key);
+    const node = findNode(treeData, key);
+    if (node) {
+      setModalInputValue(node.title as string);
+      setIsModalVisible(true);
     }
   };
 
+  const findNode = (data: TreeDataNode[], key: React.Key): TreeDataNode | null => {
+    for (let i = 0; i < data.length; i++) {
+      if (data[i].key === key) {
+        return data[i];
+      }
+      if (data[i].children) {
+        const result = findNode(data[i].children!, key);
+        if (result) {
+          return result;
+        }
+      }
+    }
+    return null;
+  };
+
+  const handleOk = () => {
+    const updateNode = (data: TreeDataNode[]): TreeDataNode[] => {
+      return data.map(item => {
+        if (item.key === editingNodeKey) {
+          item.title = modalInputValue;
+        }
+        if (item.children) {
+          item.children = updateNode(item.children);
+        }
+        return item;
+      });
+    };
+    setTreeData(updateNode(treeData));
+    setIsModalVisible(false);
+    setEditingNodeKey(null);
+    setModalInputValue('');
+  };
+
+  const handleCancel = () => {
+    setIsModalVisible(false);
+    setEditingNodeKey(null);
+    setModalInputValue('');
+  };
+
+  const onChangeModalInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setModalInputValue(e.target.value);
+  };
+
   return (
-    <>
-      <AddTodo addTodo={addTodo} todos={todos} />
-      <ListTodos
-        todos={todos}
-        updateTodo={updateTodo}
-        deleteTodo={deleteTodo}
+    <div>
+      <TodoList
+        treeData={treeData}
+        expandedKeys={expandedKeys}
+        onExpand={onExpand}
+        onDragEnter={onDragEnter}
+        onDrop={onDrop}
+        addNode={addNode}
+        editNode={editNode}
+        deleteNode={deleteNode}
       />
-    </>
+      <TodoModal
+        isModalVisible={isModalVisible}
+        handleOk={handleOk}
+        handleCancel={handleCancel}
+        modalInputValue={modalInputValue}
+        onChangeModalInput={onChangeModalInput}
+      />
+    </div>
   );
-}
+};
 
 export default App;
